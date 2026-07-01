@@ -205,6 +205,12 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCampaignId, setSelectedCampaignId] = useState(1);
 
+  // Dynamic calculations for "after-update" realism
+  const totalSourced = 450 + (leads.length - 5);
+  const totalVerified = 340 + leads.filter(l => l.status === 'Email Approved' || l.status === 'Phone Verified').length - 2;
+  const exceptionsCount = leads.filter(l => l.status === 'Review Required').length;
+  const phoneCallsCount = 40 + leads.filter(l => l.vapiStatus === 'Verified').length - 1;
+
   // Template Mapper State
   const [clientColumns, setClientColumns] = useState(['First Name', 'Last Name', 'Verified Email', 'Contact Number', 'Target Role', 'Match Weight']);
   const [columnMappings, setColumnMappings] = useState({
@@ -373,6 +379,7 @@ export default function App() {
         clearInterval(interval);
         setCallStatus('finished');
         setIsCalling(false);
+        
         // Update lead status
         setLeads(prev => prev.map(l => l.id === lead.id ? { 
           ...l, 
@@ -382,30 +389,31 @@ export default function App() {
           vapiTranscript: transcripts.slice(1)
         } : l));
         
-        setLeads(currentLeads => {
-          const updatedLead = currentLeads.find(l => l.id === lead.id);
-          if (updatedLead) {
-            setCampaigns(prevCamps => prevCamps.map(c => {
-              if (c.id === updatedLead.campaignId) {
-                return {
-                  ...c,
-                  verified: c.verified + 1,
-                  exceptions: Math.max(0, c.exceptions - 1)
-                };
-              }
-              return c;
-            }));
+        // Update campaigns list separately
+        setCampaigns(prevCamps => prevCamps.map(c => {
+          if (c.id === lead.campaignId) {
+            return {
+              ...c,
+              verified: c.verified + 1,
+              exceptions: Math.max(0, c.exceptions - 1)
+            };
           }
-          return currentLeads;
-        });
-
-        setSelectedLead(prev => ({
-          ...prev,
-          status: 'Phone Verified',
-          fitScore: 94,
-          vapiStatus: 'Verified',
-          vapiTranscript: transcripts.slice(1)
+          return c;
         }));
+
+        // Update selected lead state if it matches the simulated lead
+        setSelectedLead(prev => {
+          if (prev && prev.id === lead.id) {
+            return {
+              ...prev,
+              status: 'Phone Verified',
+              fitScore: 94,
+              vapiStatus: 'Verified',
+              vapiTranscript: transcripts.slice(1)
+            };
+          }
+          return prev;
+        });
       }
       step++;
     }, 1500);
@@ -599,7 +607,7 @@ export default function App() {
                   <div className="absolute -right-4 -top-4 w-12 h-12 bg-amber-500/5 rounded-full blur-xl group-hover:bg-amber-500/10 transition-all"></div>
                   <p className="text-[10px] font-bold text-zinc-500 tracking-wider uppercase mb-1.5 font-display">Total Sourced Cache</p>
                   <h3 className="text-2xl font-display font-extrabold text-zinc-50 tracking-tight flex items-baseline gap-2">
-                    452
+                    {totalSourced}
                     <span className="text-[10px] text-emerald-500 font-semibold bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-500/10 flex items-center">+18%</span>
                   </h3>
                   <p className="text-[11px] text-zinc-500 mt-2">since last campaign brief</p>
@@ -609,8 +617,8 @@ export default function App() {
                   <div className="absolute -right-4 -top-4 w-12 h-12 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition-all"></div>
                   <p className="text-[10px] font-bold text-zinc-500 tracking-wider uppercase mb-1.5 font-display">QA Verified & Ready</p>
                   <h3 className="text-2xl font-display font-extrabold text-zinc-50 tracking-tight flex items-baseline gap-2">
-                    343
-                    <span className="text-[10px] text-zinc-400 font-medium bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-700 flex items-center">75.8%</span>
+                    {totalVerified}
+                    <span className="text-[10px] text-zinc-400 font-medium bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-700 flex items-center">{(totalVerified / totalSourced * 100).toFixed(1)}%</span>
                   </h3>
                   <p className="text-[11px] text-zinc-500 mt-2">automation success rate</p>
                 </div>
@@ -619,7 +627,7 @@ export default function App() {
                   <div className="absolute -right-4 -top-4 w-12 h-12 bg-amber-600/5 rounded-full blur-xl group-hover:bg-amber-600/10 transition-all"></div>
                   <p className="text-[10px] font-bold text-zinc-500 tracking-wider uppercase mb-1.5 font-display">Pending Exceptions</p>
                   <h3 className="text-2xl font-display font-extrabold text-zinc-50 tracking-tight text-amber-500">
-                    {leads.filter(l => l.status === 'Review Required').length}
+                    {exceptionsCount}
                   </h3>
                   <p className="text-[11px] text-amber-500/70 mt-2 font-medium">Requires manual S2W QA sign-off</p>
                 </div>
@@ -628,7 +636,7 @@ export default function App() {
                   <div className="absolute -right-4 -top-4 w-12 h-12 bg-purple-500/5 rounded-full blur-xl group-hover:bg-purple-500/10 transition-all"></div>
                   <p className="text-[10px] font-bold text-zinc-500 tracking-wider uppercase mb-1.5 font-display">Phone verification Calls</p>
                   <h3 className="text-2xl font-display font-extrabold text-zinc-50 tracking-tight text-purple-400">
-                    41
+                    {phoneCallsCount}
                   </h3>
                   <p className="text-[11px] text-zinc-500 mt-2">Executed via Vapi AI Voice</p>
                 </div>
@@ -894,9 +902,9 @@ export default function App() {
               TAB C: LEADS INGEST (LEADS)
               ========================================== */}
           {activeTab === 'leads' && (
-            <div className="flex gap-8 items-start animate-fade-in">
-              {/* Left Panel: Leads Table */}
-              <div className="flex-1 glass-panel rounded-2xl overflow-hidden border border-zinc-800/80">
+            <div className="animate-fade-in">
+              {/* Leads Table taking full width */}
+              <div className="glass-panel rounded-xl overflow-hidden border border-zinc-800/80">
                 {/* Search / Filters Bar */}
                 <div className="p-4 border-b border-zinc-800/50 flex gap-4 bg-zinc-900/20">
                   <div className="flex-1 relative">
@@ -915,46 +923,46 @@ export default function App() {
                 <div className="overflow-y-auto max-h-[500px]">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="bg-zinc-900/40 border-b border-zinc-800/50 text-2xs font-semibold text-zinc-500 uppercase tracking-wider">
-                        <th className="p-3 pl-6">Contact Name</th>
-                        <th className="p-3">Title / Company</th>
-                        <th className="p-3">Contact Channels</th>
-                        <th className="p-3 text-center">Fit Score</th>
-                        <th className="p-3">Status</th>
+                      <tr className="bg-zinc-900/40 border-b border-zinc-800/50 text-[10px] font-bold text-zinc-500 uppercase tracking-wider font-display">
+                        <th className="p-3.5 pl-6">Contact Name</th>
+                        <th className="p-3.5">Title / Company</th>
+                        <th className="p-3.5">Contact Channels</th>
+                        <th className="p-3.5 text-center">Fit Score</th>
+                        <th className="p-3.5">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-zinc-900/60">
+                    <tbody className="divide-y divide-zinc-850/60">
                       {filteredLeads.map(l => (
                         <tr 
                           key={l.id} 
                           onClick={() => setSelectedLead(l)}
                           className={`hover:bg-zinc-800/20 transition-all cursor-pointer ${
-                            selectedLead && selectedLead.id === l.id ? 'bg-zinc-800/40 border-l-2 border-amber-500' : ''
+                            selectedLead && selectedLead.id === l.id ? 'bg-zinc-850/30 border-l-2 border-amber-500' : ''
                           }`}
                         >
-                          <td className="p-3 pl-6 font-semibold text-zinc-200">{l.name}</td>
-                          <td className="p-3">
-                            <p className="text-zinc-300 font-medium">{l.title}</p>
+                          <td className="p-3.5 pl-6 font-semibold text-zinc-200">{l.name}</td>
+                          <td className="p-3.5">
+                            <p className="text-zinc-350 font-semibold">{l.title}</p>
                             <p className="text-3xs text-zinc-500">{l.company}</p>
                           </td>
-                          <td className="p-3 space-y-1">
-                            <span className="flex items-center gap-1.5 text-zinc-400 font-mono text-3xs"><Mail className="w-3 h-3 text-zinc-500" /> {l.email || 'None'}</span>
-                            <span className="flex items-center gap-1.5 text-zinc-400 font-mono text-3xs"><Phone className="w-3 h-3 text-zinc-500" /> {l.phone || 'None'}</span>
+                          <td className="p-3.5 space-y-1">
+                            <span className="flex items-center gap-1.5 text-zinc-400 font-mono text-3xs"><Mail className="w-3 h-3 text-zinc-505" /> {l.email || 'None'}</span>
+                            <span className="flex items-center gap-1.5 text-zinc-400 font-mono text-3xs"><Phone className="w-3 h-3 text-zinc-505" /> {l.phone || 'None'}</span>
                           </td>
-                          <td className="p-3 text-center">
-                            <span className={`inline-block font-semibold px-2 py-0.5 rounded font-mono ${
-                              l.fitScore >= 85 ? 'bg-emerald-950 text-emerald-400' : 'bg-amber-950 text-amber-400'
+                          <td className="p-3.5 text-center">
+                            <span className={`inline-block font-bold px-2 py-0.5 rounded font-mono ${
+                              l.fitScore >= 85 ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/10' : 'bg-amber-950 text-amber-400 border border-amber-500/10'
                             }`}>
                               {l.fitScore}%
                             </span>
                           </td>
-                          <td className="p-3">
+                          <td className="p-3.5">
                             <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-3xs font-semibold ${
                               l.status === 'Email Approved' || l.status === 'Phone Verified'
                                 ? 'bg-emerald-950/60 text-emerald-500 border-emerald-500/20'
                                 : l.status === 'Review Required'
                                 ? 'bg-amber-950/60 text-amber-500 border-amber-500/20 animate-pulse-border'
-                                : 'bg-zinc-800/80 text-zinc-500 border-zinc-700'
+                                : 'bg-zinc-855 text-zinc-500 border-zinc-700'
                             }`}>
                               {l.status === 'Phone Verified' && <Phone className="w-2.5 h-2.5" />}
                               {l.status}
@@ -970,144 +978,6 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
-              </div>
-
-              {/* Right Panel: Lead Details Sheet (Slide-over details) */}
-              <div className="w-96 glass-panel rounded-2xl p-6 space-y-6 self-start border border-zinc-800/80 min-h-[500px]">
-                {selectedLead ? (
-                  <div className="space-y-6 animate-fade-in">
-                    
-                    {/* Header */}
-                    <div className="border-b border-zinc-800/50 pb-4">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-display font-bold text-base text-zinc-50">{selectedLead.name}</h3>
-                          <p className="text-xs text-zinc-400">{selectedLead.title}</p>
-                          <p className="text-xs text-amber-500 font-semibold">{selectedLead.company}</p>
-                        </div>
-                        <a 
-                          href={`https://${selectedLead.linkedin}`} 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="p-1.5 bg-zinc-850 hover:bg-zinc-800 rounded border border-zinc-800"
-                        >
-                          <Linkedin className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-200" />
-                        </a>
-                      </div>
-                    </div>
-
-                    {/* Metadata Section */}
-                    <div className="space-y-3 bg-zinc-950/50 p-4 rounded-xl border border-zinc-900">
-                      <div className="flex justify-between text-2xs">
-                        <span className="text-zinc-500">Industry / Size</span>
-                        <span className="text-zinc-300 font-medium">{selectedLead.industry} • {selectedLead.size} staff</span>
-                      </div>
-                      <div className="flex justify-between text-2xs">
-                        <span className="text-zinc-500">Tech Stack Match</span>
-                        <div className="flex gap-1">
-                          {selectedLead.techStack.map((tech, idx) => (
-                            <span key={idx} className="text-3xs bg-zinc-900 text-zinc-400 px-1 border border-zinc-850 rounded">{tech}</span>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="flex justify-between text-2xs">
-                        <span className="text-zinc-500">AI Fit Reason</span>
-                        <span className="text-zinc-400 block text-right max-w-[200px] truncate">{selectedLead.bio}</span>
-                      </div>
-                    </div>
-
-                    {/* Verification Pipeline Console */}
-                    <div className="space-y-4">
-                      <h4 className="text-2xs font-semibold uppercase tracking-wider text-zinc-400">Verification Pipeline Logs</h4>
-                      
-                      {/* SMTP log */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-1.5 text-3xs font-semibold text-zinc-400"><Mail className="w-3.5 h-3.5 text-zinc-500" /> Port 25 SMTP Handshake</div>
-                        <pre className="text-3xs font-mono bg-zinc-950 border border-zinc-900 p-2.5 rounded-lg max-h-24 overflow-y-auto text-zinc-500 leading-normal">
-                          {selectedLead.smtpLog}
-                        </pre>
-                      </div>
-
-                      {/* Vapi Call console */}
-                      <div className="space-y-2 border-t border-zinc-900 pt-3">
-                        <div className="flex justify-between items-center text-3xs font-semibold text-zinc-400">
-                          <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-zinc-500" /> AI Phone Call Qualification</span>
-                          <span className={`px-2 py-0.5 rounded border ${
-                            selectedLead.vapiStatus === 'Verified' 
-                              ? 'bg-emerald-950 text-emerald-500 border-emerald-500/20' 
-                              : selectedLead.vapiStatus === 'Pending Call' || selectedLead.vapiStatus === 'Exception Flagged'
-                              ? 'bg-amber-950 text-amber-500 border-amber-500/20 animate-pulse-border' 
-                              : 'bg-zinc-900 text-zinc-500 border-zinc-800'
-                          }`}>
-                            {selectedLead.vapiStatus}
-                          </span>
-                        </div>
-
-                        {/* Call action / Player */}
-                        {selectedLead.vapiStatus === 'Pending Call' && !isCalling && (
-                          <button 
-                            onClick={() => startVapiCallSimulation(selectedLead)}
-                            className="w-full flex items-center justify-center gap-1.5 bg-amber-600/10 hover:bg-amber-600/20 text-amber-500 border border-amber-500/20 font-bold py-2 rounded-lg text-2xs transition-all"
-                          >
-                            <Play className="w-3.5 h-3.5 fill-amber-500 stroke-none" /> Trigger Automated Vapi Call
-                          </button>
-                        )}
-
-                        {/* Simulation logs */}
-                        {isCalling && selectedLead.vapiStatus === 'Pending Call' && (
-                          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-3 space-y-2 font-mono text-3xs">
-                            <div className="flex items-center justify-between text-zinc-500">
-                              <span className="flex items-center gap-1.5"><RefreshCw className="w-3 h-3 animate-spin text-amber-500" /> State: {callStatus.toUpperCase()}</span>
-                              <span className="h-1.5 w-1.5 bg-amber-500 rounded-full animate-ping"></span>
-                            </div>
-                            <div className="max-h-24 overflow-y-auto space-y-1.5 pr-2">
-                              {callTranscript.map((t, idx) => (
-                                <p key={idx} className={t.speaker.startsWith('Agent') ? 'text-amber-500' : 'text-zinc-400'}>
-                                  <strong>{t.speaker}:</strong> {t.text}
-                                </p>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Realized Log */}
-                        {selectedLead.vapiTranscript && selectedLead.vapiTranscript.length > 0 && !isCalling && (
-                          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-3 space-y-1.5 font-mono text-3xs max-h-28 overflow-y-auto">
-                            {selectedLead.vapiTranscript.map((t, idx) => (
-                              <p key={idx} className={t.speaker.startsWith('Agent') ? 'text-amber-500' : 'text-zinc-400'}>
-                                <strong>{t.speaker}:</strong> {t.text}
-                              </p>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Manual Override Action for S2W Sourcing staff */}
-                    {selectedLead.status === 'Review Required' && (
-                      <div className="flex gap-2 pt-2 border-t border-zinc-900">
-                        <button 
-                          onClick={() => handleApproveException(selectedLead.id)}
-                          className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-zinc-950 text-2xs font-bold py-2 rounded-lg transition-all"
-                        >
-                          <Check className="w-3.5 h-3.5 stroke-[2.5]" /> Approve Fit
-                        </button>
-                        <button 
-                          onClick={() => handleDiscardException(selectedLead.id)}
-                          className="flex-1 flex items-center justify-center gap-1.5 bg-zinc-900 hover:bg-zinc-850 text-zinc-400 border border-zinc-800 text-2xs font-semibold py-2 rounded-lg transition-all"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" /> Disqualify
-                        </button>
-                      </div>
-                    )}
-
-                  </div>
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-center text-zinc-600 py-24">
-                    <FileText className="w-10 h-10 mb-3 stroke-[1]" />
-                    <p className="text-xs">Select a lead from the enrichment hub to view the QA diagnostics sheet.</p>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -1130,7 +1000,12 @@ export default function App() {
               {/* Exception Cards Grid */}
               <div className="grid grid-cols-2 gap-6">
                 {leads.filter(l => l.status === 'Review Required').map(lead => (
-                  <div key={lead.id} className="glass-panel rounded-2xl p-6 border border-zinc-800/80 hover:border-zinc-700/60 transition-all flex flex-col justify-between space-y-6">
+                  <div 
+                    key={lead.id} 
+                    onClick={() => setSelectedLead(lead)}
+                    className="glass-panel rounded-xl p-6 border border-zinc-800/80 hover:border-zinc-750 hover:shadow-lg hover:shadow-amber-500/2 transition-all duration-300 flex flex-col justify-between space-y-5 cursor-pointer relative overflow-hidden group"
+                  >
+                    <div className="absolute -right-4 -top-4 w-12 h-12 bg-amber-500/2 rounded-full blur-xl group-hover:bg-amber-500/5 transition-all"></div>
                     <div className="space-y-4">
                       {/* Lead Title Header */}
                       <div className="flex items-start justify-between">
@@ -1187,11 +1062,11 @@ export default function App() {
                     </div>
 
                     {/* Approval actions */}
-                    <div className="flex gap-2 pt-4 border-t border-zinc-900">
+                    <div className="flex gap-2 pt-4 border-t border-zinc-900" onClick={(e) => e.stopPropagation()}>
                       {lead.vapiStatus === 'Pending Call' ? (
                         <button 
-                          onClick={() => { setActiveTab('leads'); setSelectedLead(lead); startVapiCallSimulation(lead); }}
-                          className="flex-1 flex items-center justify-center gap-1.5 bg-amber-600/10 hover:bg-amber-600/20 text-amber-500 border border-amber-500/20 text-3xs font-bold py-2 rounded-lg transition-all"
+                          onClick={() => { setSelectedLead(lead); startVapiCallSimulation(lead); }}
+                          className="flex-1 flex items-center justify-center gap-1.5 bg-amber-600/10 hover:bg-amber-600/20 text-amber-500 border border-amber-500/20 text-3xs font-bold py-2 rounded-lg transition-all cursor-pointer"
                         >
                           <Phone className="w-3.5 h-3.5" /> Call to Verify
                         </button>
@@ -1300,6 +1175,159 @@ export default function App() {
 
         </div>
       </main>
+
+      {/* ==========================================
+          SLIDE-OUT LEAD DETAILS DRAWER OVERLAY
+          ========================================== */}
+      {selectedLead && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex justify-end animate-fade-in"
+          onClick={() => setSelectedLead(null)}
+        >
+          <div 
+            className="w-[460px] h-full bg-zinc-950/98 border-l border-zinc-800 shadow-2xl p-6 overflow-y-auto relative animate-slide-left flex flex-col justify-between scrollbar-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drawer Body Container */}
+            <div className="space-y-6">
+              
+              {/* Close Button */}
+              <button 
+                onClick={() => setSelectedLead(null)}
+                className="absolute top-5 right-5 text-zinc-500 hover:text-zinc-300 p-1.5 hover:bg-zinc-900 rounded-lg transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              {/* Title Header */}
+              <div className="border-b border-zinc-800/50 pb-4 pr-8">
+                <h3 className="font-display font-bold text-lg text-zinc-50 tracking-tight">{selectedLead.name}</h3>
+                <p className="text-xs text-zinc-400 font-medium">{selectedLead.title}</p>
+                <p className="text-xs text-amber-500 font-semibold mt-0.5">{selectedLead.company}</p>
+              </div>
+
+              {/* Grid Metadata Section */}
+              <div className="grid grid-cols-2 gap-4 bg-zinc-900/30 border border-zinc-900 p-4 rounded-xl">
+                <div>
+                  <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider font-display block mb-0.5">Industry</span>
+                  <span className="text-xs text-zinc-300 font-medium">{selectedLead.industry}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider font-display block mb-0.5">Company Size</span>
+                  <span className="text-xs text-zinc-300 font-medium">{selectedLead.size} staff</span>
+                </div>
+                <div className="col-span-2 border-t border-zinc-900 pt-3">
+                  <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider font-display block mb-1.5">Tech Stack Match</span>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedLead.techStack.map((tech, idx) => (
+                      <span key={idx} className="text-3xs bg-zinc-900/80 text-zinc-400 px-2 py-0.5 border border-zinc-800 rounded font-semibold">{tech}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Fit Analysis */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider font-display block">AI Fit Analysis</span>
+                <p className="text-xs text-zinc-300 leading-relaxed bg-zinc-900/10 border border-zinc-900/50 p-3.5 rounded-xl">
+                  {selectedLead.bio}
+                </p>
+              </div>
+
+              {/* Website Scraped Content */}
+              <div className="space-y-1.5 bg-zinc-900/10 border border-zinc-900/50 p-3.5 rounded-xl">
+                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider font-display flex items-center gap-1.5"><Globe className="w-3.5 h-3.5 text-zinc-400" /> Scraped Website Summary</span>
+                <p className="text-xs text-zinc-400 leading-relaxed italic">{selectedLead.website}</p>
+              </div>
+
+              {/* Verification Pipeline Console */}
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider font-display border-b border-zinc-900 pb-2">Verification Pipeline Logs</h4>
+                
+                {/* SMTP log */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-3xs font-semibold text-zinc-400"><Mail className="w-3.5 h-3.5 text-zinc-500" /> Port 25 SMTP Handshake</div>
+                  <pre className="text-3xs font-mono bg-zinc-950 border border-zinc-900 p-3 rounded-xl max-h-28 overflow-y-auto text-zinc-500 leading-normal scrollbar-none">
+                    {selectedLead.smtpLog}
+                  </pre>
+                </div>
+
+                {/* Vapi Call console */}
+                <div className="space-y-2 border-t border-zinc-900 pt-3">
+                  <div className="flex justify-between items-center text-3xs font-semibold text-zinc-400">
+                    <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-zinc-500" /> AI Phone Call Qualification</span>
+                    <span className={`px-2 py-0.5 rounded border text-3xs ${
+                      selectedLead.vapiStatus === 'Verified' 
+                        ? 'bg-emerald-950 text-emerald-500 border-emerald-500/20' 
+                        : selectedLead.vapiStatus === 'Pending Call' || selectedLead.vapiStatus === 'Exception Flagged'
+                        ? 'bg-amber-950 text-amber-500 border-amber-500/20 animate-pulse-border' 
+                        : 'bg-zinc-900 text-zinc-500 border-zinc-800'
+                    }`}>
+                      {selectedLead.vapiStatus}
+                    </span>
+                  </div>
+
+                  {/* Call action / Player */}
+                  {selectedLead.vapiStatus === 'Pending Call' && !isCalling && (
+                    <button 
+                      onClick={() => startVapiCallSimulation(selectedLead)}
+                      className="w-full flex items-center justify-center gap-1.5 bg-amber-600/10 hover:bg-amber-600/20 text-amber-500 border border-amber-500/20 font-bold py-2 rounded-lg text-2xs transition-all cursor-pointer font-display"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-amber-500 stroke-none" /> Trigger Automated Vapi Call
+                    </button>
+                  )}
+
+                  {/* Simulation logs */}
+                  {isCalling && selectedLead.vapiStatus === 'Pending Call' && (
+                    <div className="bg-zinc-950 border border-zinc-900 rounded-xl p-3.5 space-y-2.5 font-mono text-3xs">
+                      <div className="flex items-center justify-between text-zinc-500">
+                        <span className="flex items-center gap-1.5"><RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-500" /> State: {callStatus.toUpperCase()}</span>
+                        <span className="h-1.5 w-1.5 bg-amber-500 rounded-full animate-ping"></span>
+                      </div>
+                      <div className="max-h-24 overflow-y-auto space-y-2 pr-2 scrollbar-none">
+                        {callTranscript.map((t, idx) => (
+                          <p key={idx} className={t.speaker.startsWith('Agent') ? 'text-amber-500' : 'text-zinc-400'}>
+                            <strong>{t.speaker}:</strong> {t.text}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Realized Log */}
+                  {selectedLead.vapiTranscript && selectedLead.vapiTranscript.length > 0 && !isCalling && (
+                    <div className="bg-zinc-950 border border-zinc-900 rounded-xl p-3.5 space-y-2 font-mono text-3xs max-h-32 overflow-y-auto scrollbar-none">
+                      {selectedLead.vapiTranscript.map((t, idx) => (
+                        <p key={idx} className={t.speaker.startsWith('Agent') ? 'text-amber-500' : 'text-zinc-400'}>
+                          <strong>{t.speaker}:</strong> {t.text}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Manual Override Action Footer */}
+            {selectedLead.status === 'Review Required' && (
+              <div className="flex gap-3 pt-4 border-t border-zinc-900 mt-6 bg-zinc-950 sticky bottom-0" onClick={(e) => e.stopPropagation()}>
+                <button 
+                  onClick={() => handleApproveException(selectedLead.id)}
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-zinc-950 text-2xs font-bold py-2.5 rounded-lg transition-all cursor-pointer font-display"
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" /> Approve Fit
+                </button>
+                <button 
+                  onClick={() => handleDiscardException(selectedLead.id)}
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-zinc-900 hover:bg-zinc-850 text-zinc-400 border border-zinc-800 text-2xs font-semibold py-2.5 rounded-lg transition-all cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Disqualify
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
